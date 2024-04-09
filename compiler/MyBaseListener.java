@@ -1,3 +1,11 @@
+/**
+* Class that overrides some of the methods of the ANTLR generated base listener that will be responsible for performing bytecode operations for the grammar rules
+* @author Matt Rice
+* @version 1.0
+* Assignment 5
+* CS322 - Compiler Construction
+* Spring 2024
+**/
 package compiler;
 
 import lexparse.*;
@@ -72,6 +80,8 @@ public class MyBaseListener extends KnightCodeBaseListener{
     public void enterFile(KnightCodeParser.FileContext ctx){
         System.out.println("Entering File");
 
+        programName = ctx.ID().getText();
+
         beginClass();
     }//end enterFile
 
@@ -95,12 +105,6 @@ public class MyBaseListener extends KnightCodeBaseListener{
         symbolTable = new HashMap<>();
         memoryPointer = 0;
     }//end enterDeclare
-   
-    @Override
-    //triggered once declare block has ended
-    public void exitDeclare(KnightCodeParser.DeclareContext ctx){ 
-
-    }//end exitDeclare
 
     @Override
     /**
@@ -124,6 +128,43 @@ public class MyBaseListener extends KnightCodeBaseListener{
         mainVisitor.visitCode();
     }//end enterBody
 
+    public void evalExpr(KnightCodeParser.ExprContext ctx){
+        
+        // If the expr is just a number reads and parses the text as an int and loads it to constant pool
+        if (ctx instanceof KnightCodeParser.NumberContext){
+            int value = Integer.parseInt(ctx.getText());
+            
+            //debug
+            System.out.println("expr val " + value);
+            mainVisitor.visitLdcInsn(value);
+        }//number
+
+        // If the expr is an identifier
+        else if (ctx instanceof KnightCodeParser.IdContext){
+            String id = ctx.getText();
+            Variable var = symbolTable.get(id);
+            
+            //debug
+            System.out.println("expr id " + id);
+
+            // If type of the variable is INTEGER
+            if (var.getType().equals("INTEGER")){
+                mainVisitor.visitVarInsn(Opcodes.ILOAD, var.getLocation());
+            }
+
+            else if (var.getType().equals("STRING")){
+                mainVisitor.visitVarInsn(Opcodes.ALOAD, var.getLocation());
+            }
+            
+        }//id
+
+        //Addition context
+        else if (ctx instanceof KnightCodeParser.AdditionContext){
+
+        }
+            
+    }//end evalExpr
+
     @Override
     /**
      * Is triggered when Setvar is entered and will define a previously declared variable
@@ -132,6 +173,9 @@ public class MyBaseListener extends KnightCodeBaseListener{
         String varName = ctx.ID().getText(); 
         Variable var = symbolTable.get(varName);
         
+        //Need to evaluate EXPR before setting stuff
+        //Make a method that takes in expr context and checks for operators and such
+
         // If the variable was not previously declared
         // May do error handling in the future
         if (var == null){

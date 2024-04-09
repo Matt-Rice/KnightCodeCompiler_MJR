@@ -1,0 +1,9 @@
+PROGRAM test1
+
+DECLARE
+    INTEGER x
+
+BEGIN
+    SET x := 5
+
+END
