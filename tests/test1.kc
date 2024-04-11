@@ -2,8 +2,14 @@ PROGRAM test1
 
 DECLARE
     INTEGER x
+    STRING y
 
 BEGIN
     SET x := 5
+    SET y := "Hello"
+
+    PRINT x
+    PRINT y 
+    PRINT "Joe Biden"
 
 END

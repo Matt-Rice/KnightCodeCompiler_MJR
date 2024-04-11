@@ -20,7 +20,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
 
     private ClassWriter cw;  //ClassWriter for a KnightCode class
 	private MethodVisitor mainVisitor; //global MethodVisitor
-	private String programName; //name of the class and the output file (used by ASM)
+	private String programName; //name of the output file
     private Map<String, Variable> symbolTable; //map that will store the name of the variable along with its corresponding Variable object which will contain some of its attributes
     private int memoryPointer;
     /**
@@ -33,9 +33,19 @@ public class MyBaseListener extends KnightCodeBaseListener{
     }//end constructor
 
     /**
-     * Method to setup the compiled program by initializing the ClassWriter, making the constructor, and starting the main method
+     * Method that removes the first and last characters of a string (Will be used to remove quotes around Strings when printing)
+     * @param s the string that will be modified
+     * @return the string without the first and last characters
      */
-    public void beginClass(){
+    public String removeFirstandLast(String s){
+        return s.substring(1, s.length() -1);
+    }//end removeFirstandLast
+
+    /**
+     * Method that will set up the ClassWriter and create the constructor
+     * @param name the name of the program that will be created
+     */
+    public void beginClass(String name){
         
         // Set up the classwriter
 		cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
@@ -81,8 +91,9 @@ public class MyBaseListener extends KnightCodeBaseListener{
         System.out.println("Entering File");
 
         programName = ctx.ID().getText();
+    
 
-        beginClass();
+        beginClass(programName);
     }//end enterFile
 
     @Override
@@ -102,6 +113,9 @@ public class MyBaseListener extends KnightCodeBaseListener{
      * Once Declare is entered, a HashMap for the symbol table will be initialized and the stack memory pointer will be set to zero
      */
     public void enterDeclare(KnightCodeParser.DeclareContext ctx){
+        //Debug
+        System.out.println("Enter Declare");
+        
         symbolTable = new HashMap<>();
         memoryPointer = 0;
     }//end enterDeclare
@@ -111,7 +125,17 @@ public class MyBaseListener extends KnightCodeBaseListener{
      * Once variable is entered, the name and type will be used to instantiate a new Variable object using the attributes from the declaration and put it into the symbol table
      */
     public void enterVariable(KnightCodeParser.VariableContext ctx){
+        //Debug
+        System.out.println("Enter Variable");
+        
         String type = ctx.vartype().getText();
+
+        // Check if declared type is unsupported
+        if (!type.equals("INTEGER") && !type.equals("STRING")){
+            System.err.println("Compilation error: the entered type is not supported.");
+            System.exit(1);
+        }
+
         String name = ctx.identifier().getText();
         Variable v = new Variable(name, type, memoryPointer++);
         symbolTable.put(name, v);
@@ -122,6 +146,9 @@ public class MyBaseListener extends KnightCodeBaseListener{
      * Triggers when body is entered and initializes the main method
      */
     public void enterBody(KnightCodeParser.BodyContext ctx){
+        //Debug
+        System.out.println("Enter Body");
+        
         // Start MethodVisitor for main method
         
         mainVisitor=cw.visitMethod(Opcodes.ACC_PUBLIC+Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null);
@@ -170,6 +197,10 @@ public class MyBaseListener extends KnightCodeBaseListener{
      * Is triggered when Setvar is entered and will define a previously declared variable
      */
     public void enterSetvar(KnightCodeParser.SetvarContext ctx){
+        //Debug
+        System.out.println("Enter SetVar");
+
+        
         String varName = ctx.ID().getText(); 
         Variable var = symbolTable.get(varName);
         
@@ -192,12 +223,47 @@ public class MyBaseListener extends KnightCodeBaseListener{
         
         //Defines variable if it is an STRING
         if (var.getType().equals("STRING")){
-            String value = ctx.expr().getText();
+            String value = removeFirstandLast(ctx.STRING().getText());
             mainVisitor.visitLdcInsn(value);
             mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation());
         }
 
     }//end enterSetvar
+
+    @Override
+    /**
+     * Is triggered whenever print is encountered and will either print out the value of the identifier specified, or a string that is specified
+     */
+    public void enterPrint(KnightCodeParser.PrintContext ctx){
+        //Debug
+        System.out.println("Enter Print");
+        
+        mainVisitor.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+
+        // If the subject of the printing is an ID then it searches and finds its stack location so it can be loaded to be printed
+        if(ctx.ID() != null){   
+            String varID = ctx.ID().getText();
+            Variable var = symbolTable.get(varID);
+            int location = var.getLocation(); //location of the variable
+
+            if (var.getType().equals("INTEGER")){
+                mainVisitor.visitVarInsn(Opcodes.ILOAD, location);
+                mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(I)V", false);
+            }
+            else{
+                mainVisitor.visitVarInsn(Opcodes.ALOAD, location);
+                mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+            }
+        }
+        //If the subject is a String, it will load the string to the constant pool
+        else if(ctx.STRING()!=null){
+            String str = removeFirstandLast(ctx.STRING().getText());
+            mainVisitor.visitLdcInsn(str);
+            mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+        }
+    }//end enterPrint
+
+    
     
 }//end MyBaseListener
  
