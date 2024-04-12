@@ -43,5 +43,9 @@ public class Variable {
     public int getLocation(){
         return memoryLocation;
     }// end getLocation
+
+    public String toString(){
+        return "Name: " + name + "Type: " + variableType + " Memory loc: " + memoryLocation;
+    }
     
 }//end Variable

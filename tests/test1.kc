@@ -6,10 +6,10 @@ DECLARE
 BEGIN
     SET x := 5
 
-    SET z := 1 + x
+    SET z := x - 1
 
     PRINT x
     PRINT z
-    PRINT "Joe Biden"
+    
 
 END

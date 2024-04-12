@@ -121,6 +121,14 @@ public class MyBaseListener extends KnightCodeBaseListener{
     }//end enterDeclare
 
     @Override
+    public void exitDeclare(KnightCodeParser.DeclareContext ctx){
+        System.out.println("SymbolTable");
+        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
+            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
+        }
+    }
+
+    @Override
     /**
      * Once variable is entered, the name and type will be used to instantiate a new Variable object using the attributes from the declaration and put it into the symbol table
      */
@@ -162,7 +170,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
             int value = Integer.parseInt(ctx.getText());
             
             //debug
-            System.out.println("expr val " + value);
+            System.out.println(value + "Is on stack");
             mainVisitor.visitLdcInsn(value);
         }//number
 
@@ -172,11 +180,12 @@ public class MyBaseListener extends KnightCodeBaseListener{
             Variable var = symbolTable.get(id);
             
             //debug
-            System.out.println("expr id " + id);
+            System.out.println("expr id " + id + "\nvar: " + var.toString());
 
             // If type of the variable is INTEGER
             if (var.getType().equals("INTEGER")){
                 mainVisitor.visitVarInsn(Opcodes.ILOAD, var.getLocation());
+                System.out.println(id+ "is on stack");
             }
 
             else if (var.getType().equals("STRING")){
@@ -184,6 +193,15 @@ public class MyBaseListener extends KnightCodeBaseListener{
             } 
             
         }//id   
+        else if (ctx instanceof KnightCodeParser.SubtractionContext){
+            
+            for(KnightCodeParser.ExprContext expr : ((KnightCodeParser.SubtractionContext)ctx).expr()){
+                evalExpr(expr);
+            }//for
+        System.out.println("subbing");
+        mainVisitor.visitInsn(Opcodes.ISUB);
+            
+        }
             
     }//end evalExpr
     
@@ -207,28 +225,21 @@ public class MyBaseListener extends KnightCodeBaseListener{
 
         }//for
     }//end enterAddition
-
+/* 
     @Override
     /**
      * Method that will sub exprs
-     */
+     
     public void enterSubtraction(KnightCodeParser.SubtractionContext ctx){
-        int j = 0;
+        
         //For loop that will use evalExpr to load the value of each expression and do subtraction
-        for (int i = 0; i<ctx.expr().size(); i++){
-            evalExpr(ctx.expr(i));
-            j++;
-            
-            //Loads sub after every operation after the first operation
-            if(j >= 2){
-                //debug
-                System.out.println("subbing");
-                mainVisitor.visitInsn(Opcodes.ISUB);
-            }
-
+        for (KnightCodeParser.ExprContext expr : ctx.expr()){
+            evalExpr(expr);
         }//for
+        System.out.println("subbing");
+            mainVisitor.visitInsn(Opcodes.ISUB);
     }//end enterSubtraction
-
+*/
     @Override
     /**
      * Method that will div exprs 
@@ -264,7 +275,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
             //Loads mul after every operation after the first operation
             if(j >= 2){
                 //debug
-                System.out.println("dividing");
+                System.out.println("multiplying");
                 mainVisitor.visitInsn(Opcodes.IMUL);
             }
 
@@ -276,11 +287,12 @@ public class MyBaseListener extends KnightCodeBaseListener{
      * Is triggered when Setvar is entered and will define a previously declared variable
      */
     public void enterSetvar(KnightCodeParser.SetvarContext ctx){
-        //Debug
-        System.out.println("Enter SetVar");
-
-        
+    
         String varName = ctx.ID().getText(); 
+
+        //Debug
+        System.out.println("Enter SetVar: " + varName);
+
         Variable var = symbolTable.get(varName);
         
         //Need to evaluate EXPR before setting stuff
@@ -292,23 +304,32 @@ public class MyBaseListener extends KnightCodeBaseListener{
             System.err.println(varName + " has not been declared yet");
             System.exit(1);
         }
+        evalExpr(ctx.expr());
 
         //Defines variable if it is an INTEGER
         if (var.getType().equals("INTEGER")){
-            int value = Integer.parseInt(ctx.expr().getText());
-            mainVisitor.visitIntInsn(Opcodes.SIPUSH, value);
+            System.out.println("Storing for " + varName);
             mainVisitor.visitVarInsn(Opcodes.ISTORE, var.getLocation());
         }
         
         //Defines variable if it is an STRING
-        if (var.getType().equals("STRING")){
-            String value = removeFirstandLast(ctx.STRING().getText());
-            mainVisitor.visitLdcInsn(value);
+        else if (var.getType().equals("STRING")){
             mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation());
+        }
+        System.out.println("SymbolTable");
+        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
+            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
         }
 
     }//end enterSetvar
 
+    @Override
+    public void exitSetvar(KnightCodeParser.SetvarContext ctx){
+        System.out.println("Exiting setVar\nSymbolTable");
+        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
+            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
+        }
+    }
     @Override
     /**
      * Is triggered whenever print is encountered and will either print out the value of the identifier specified, or a string that is specified
