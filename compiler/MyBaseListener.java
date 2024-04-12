@@ -154,7 +154,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
         mainVisitor=cw.visitMethod(Opcodes.ACC_PUBLIC+Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null);
         mainVisitor.visitCode();
     }//end enterBody
-
+    
     public void evalExpr(KnightCodeParser.ExprContext ctx){
         
         // If the expr is just a number reads and parses the text as an int and loads it to constant pool
@@ -181,16 +181,95 @@ public class MyBaseListener extends KnightCodeBaseListener{
 
             else if (var.getType().equals("STRING")){
                 mainVisitor.visitVarInsn(Opcodes.ALOAD, var.getLocation());
-            }
+            } 
             
-        }//id
-
-        //Addition context
-        else if (ctx instanceof KnightCodeParser.AdditionContext){
-
-        }
+        }//id   
             
     }//end evalExpr
+    
+    @Override
+    /**
+     * Method that will add exprs 
+     */
+    public void enterAddition(KnightCodeParser.AdditionContext ctx){
+        int j = 0;
+        //For loop that will use evalExpr to load the value of each expression and do addition
+        for (int i = 0; i<ctx.expr().size(); i++){
+            evalExpr(ctx.expr(i));
+            j++;
+            
+            //Loads add after every operation after the first operation
+            if(j >= 2){
+                //debug
+                System.out.println("adding");
+                mainVisitor.visitInsn(Opcodes.IADD);
+            }
+
+        }//for
+    }//end enterAddition
+
+    @Override
+    /**
+     * Method that will sub exprs
+     */
+    public void enterSubtraction(KnightCodeParser.SubtractionContext ctx){
+        int j = 0;
+        //For loop that will use evalExpr to load the value of each expression and do subtraction
+        for (int i = 0; i<ctx.expr().size(); i++){
+            evalExpr(ctx.expr(i));
+            j++;
+            
+            //Loads sub after every operation after the first operation
+            if(j >= 2){
+                //debug
+                System.out.println("subbing");
+                mainVisitor.visitInsn(Opcodes.ISUB);
+            }
+
+        }//for
+    }//end enterSubtraction
+
+    @Override
+    /**
+     * Method that will div exprs 
+     */
+    public void enterDivision(KnightCodeParser.DivisionContext ctx){
+        int j = 0;
+        //For loop that will use evalExpr to load the value of each expression and do division
+        for (int i = 0; i<ctx.expr().size(); i++){
+            evalExpr(ctx.expr(i));
+            j++;
+            
+            //Loads div after every operation after the first operation
+            if(j >= 2){
+                //debug
+                System.out.println("dividing");
+                mainVisitor.visitInsn(Opcodes.IDIV);
+            }
+
+        }//for
+    }//end enterDivision
+
+    @Override
+    /**
+     * Method that will mul exprs 
+     */
+    public void enterMultiplication(KnightCodeParser.MultiplicationContext ctx){
+        int j = 0;
+        //For loop that will use evalExpr to load the value of each expression and do multiplication
+        for (int i = 0; i<ctx.expr().size(); i++){
+            evalExpr(ctx.expr(i));
+            j++;
+            
+            //Loads mul after every operation after the first operation
+            if(j >= 2){
+                //debug
+                System.out.println("dividing");
+                mainVisitor.visitInsn(Opcodes.IMUL);
+            }
+
+        }//for
+    }//end enterDivision
 
     @Override
     /**
@@ -264,6 +343,55 @@ public class MyBaseListener extends KnightCodeBaseListener{
     }//end enterPrint
 
     
+    @Override
+    /**
+     * Method that will read an input from the user and store it in the variable whose identifier follows the read call 
+     */
+    public void enterRead(KnightCodeParser.ReadContext ctx){
+        //debug
+        System.out.println("Entering Read");
+        
+        //Initializes the variable that will store the value inputted by the user
+        Variable var = symbolTable.get(ctx.ID().getText());
+        int scanLocation = memoryPointer++;
+
+        // Initializes the Scanner object
+        mainVisitor.visitTypeInsn(Opcodes.NEW, "java/util/Scanner"); // Creates Scanner and pushes it to the stack
+        mainVisitor.visitInsn(Opcodes.DUP); // Duplicates the Scanner reference which will be used in initializing and storing the scanner
+        mainVisitor.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "in", "Ljava/io/InputStream;"); // System.in
+        mainVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/util/Scanner", "<init>", "(Ljava/io/InputStream;)V", false); // Initializes Scanner
+        mainVisitor.visitVarInsn(Opcodes.ASTORE, scanLocation); // Stores Scanner
+
+        //Handles if variable is of type int
+        if (var.getType().equals("INTEGER")){
+            // Prompts the user to enter an integer
+            mainVisitor.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+            mainVisitor.visitLdcInsn("Please enter an integer value for " + ctx.ID().getText() + ": ");  
+            mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+
+            // Read integer input from the user
+            mainVisitor.visitVarInsn(Opcodes.ALOAD, scanLocation); // Loads scanner
+            mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/Scanner", "nextInt", "()I", false); // Scan.nextLong()
+            mainVisitor.visitVarInsn(Opcodes.ISTORE, var.getLocation()); // Store the int value in a variable
+        }
+        
+        //Handles if variable is of type String
+        else if (var.getType().equals("STRING")){
+            // Prompts the user to enter a String
+            mainVisitor.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+            mainVisitor.visitLdcInsn("Please enter a String value for " + ctx.ID().getText() + ": ");  
+            mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+
+            // Read integer input from the user
+            mainVisitor.visitVarInsn(Opcodes.ALOAD, scanLocation); // Loads scanner
+            mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/Scanner", "nextLine", "()Ljava/lang/String;", false); // Scan.nextLong()
+            mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation()); // Store the int value in a variable
+        }
+
+
+    }//end enterRead
+    
+
     
 }//end MyBaseListener
  

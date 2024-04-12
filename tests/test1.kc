@@ -2,14 +2,14 @@ PROGRAM test1
 
 DECLARE
     INTEGER x
-    STRING y
-
+    INTEGER z
 BEGIN
     SET x := 5
-    SET y := "Hello"
+
+    SET z := 1 + x
 
     PRINT x
-    PRINT y 
+    PRINT z
     PRINT "Joe Biden"
 
 END
