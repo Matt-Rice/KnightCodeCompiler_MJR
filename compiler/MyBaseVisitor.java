@@ -1,4 +1,4 @@
-/**
+ /**
 * Class that overrides some of the methods of the ANTLR generated base listener that will be responsible for performing bytecode operations for the grammar rules
 * @author Matt Rice
 * @version 1.0
@@ -15,22 +15,22 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.objectweb.asm.*;  //classes for generating bytecode
 import compiler.utils.*;
 import java.util.*;
-import java.lang.*;
 
-public class MyBaseListener extends KnightCodeBaseListener{
+
+public class MyBaseVisitor extends KnightCodeBaseVisitor{
 
     private ClassWriter cw;  //ClassWriter for a KnightCode class
 	private MethodVisitor mainVisitor; //global MethodVisitor
 	private String programName; //name of the output file
     private Map<String, Variable> symbolTable; //map that will store the name of the variable along with its corresponding Variable object which will contain some of its attributes
     private int memoryPointer;
-    private Stack<Integer> condManager; //Manages
+
 
     /**
      * Constructor for MyBaseListener
      * @param programName the name of the program
      */
-    public MyBaseListener(String programName){
+    public MyBaseVisitor(String programName){
         this.programName = programName;
         
     }//end constructor
@@ -43,6 +43,13 @@ public class MyBaseListener extends KnightCodeBaseListener{
     public String removeFirstandLast(String s){
         return s.substring(1, s.length() -1);
     }//end removeFirstandLast
+
+    public void printSymbolTable(){
+        System.out.println("SymbolTable");
+        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
+            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
+        }
+    }
 
     /**
      * Method that will set up the ClassWriter and create the constructor
@@ -90,54 +97,40 @@ public class MyBaseListener extends KnightCodeBaseListener{
     /**
      * Begins the KnightCode class and is triggered once file is entered 
      */
-    public void enterFile(KnightCodeParser.FileContext ctx){
+    public Object visitFile(KnightCodeParser.FileContext ctx){
         System.out.println("Entering File");
 
         programName = ctx.ID().getText();
     
 
         beginClass(programName);
+        return super.visitFile(ctx);
     }//end enterFile
 
-    @Override
-    /**
-     * Closes the KnightCode class triggered once the end of the program is reached
-     */
-    public void exitFile(KnightCodeParser.FileContext ctx){
-        
-        closeClass();
-
-        System.out.println("Exiting File");
-    }//end exitFile
+    
 
     @Override
     // triggered once declare is reached
     /**
      * Once Declare is entered, a HashMap for the symbol table will be initialized and the stack memory pointer will be set to zero
      */
-    public void enterDeclare(KnightCodeParser.DeclareContext ctx){
+    public Object visitDeclare(KnightCodeParser.DeclareContext ctx){
         //Debug
-        System.out.println("Enter Declare");
+        System.out.println("Visit Declare");
         
         symbolTable = new HashMap<>();
         memoryPointer = 0;
-    }//end enterDeclare
 
-    @Override
-    public void exitDeclare(KnightCodeParser.DeclareContext ctx){
-        System.out.println("SymbolTable");
-        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
-            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
-        }
-    }
+        return super.visitDeclare(ctx);
+    }//end enterDeclare
 
     @Override
     /**
      * Once variable is entered, the name and type will be used to instantiate a new Variable object using the attributes from the declaration and put it into the symbol table
      */
-    public void enterVariable(KnightCodeParser.VariableContext ctx){
+    public Object visitVariable(KnightCodeParser.VariableContext ctx){
         //Debug
-        System.out.println("Enter Variable");
+        System.out.println("Visit Variable");
         
         String type = ctx.vartype().getText();
 
@@ -150,20 +143,28 @@ public class MyBaseListener extends KnightCodeBaseListener{
         String name = ctx.identifier().getText();
         Variable v = new Variable(name, type, memoryPointer++);
         symbolTable.put(name, v);
+
+        printSymbolTable();
+
+        return super.visitVariable(ctx);
     }//end enterVariable
 
     @Override
     /**
      * Triggers when body is entered and initializes the main method
      */
-    public void enterBody(KnightCodeParser.BodyContext ctx){
+    public Object visitBody(KnightCodeParser.BodyContext ctx){
         //Debug
         System.out.println("Enter Body");
+
+        //compResults = new Stack<Boolean>();
         
         // Start MethodVisitor for main method
         
         mainVisitor=cw.visitMethod(Opcodes.ACC_PUBLIC+Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null);
         mainVisitor.visitCode();
+
+        return super.visitBody(ctx);
     }//end enterBody
     
     public void evalExpr(KnightCodeParser.ExprContext ctx){
@@ -239,15 +240,17 @@ public class MyBaseListener extends KnightCodeBaseListener{
 
     @Override
 
-    public void enterComparison(KnightCodeParser.ComparisonContext ctx){
+    public Object visitComparison(KnightCodeParser.ComparisonContext ctx){
         
-        String op = ctx.comp().getText();
-
         Label trueLabel = new Label();
         Label endLabel = new Label();
 
+        String op = ctx.comp().getText();
+
         evalExpr(ctx.expr(0));
         evalExpr(ctx.expr(1));
+
+
 
         switch (op) {
             case "GT":
@@ -276,6 +279,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
 
         mainVisitor.visitLabel(endLabel);
 
+        return super.visitComparison(ctx);
     }
 
     /**
@@ -298,7 +302,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
     }//end loadInteger
     
     @Override
-    public void enterDecision(KnightCodeParser.DecisionContext ctx){
+    public Object visitDecision(KnightCodeParser.DecisionContext ctx){
         Label trueLabel = new Label();
         Label endLabel = new Label();
         
@@ -330,17 +334,19 @@ public class MyBaseListener extends KnightCodeBaseListener{
                 break;
         }
         //Else executes here
-        
+        visitStat(ctx.stat(1));
         
         mainVisitor.visitJumpInsn(Opcodes.GOTO, endLabel);
 
 
         // Go here when comparison is true
         mainVisitor.visitLabel(trueLabel);
-        
+        visitStat(ctx.stat(0));
         
         //End label
         mainVisitor.visitLabel(endLabel);
+
+        return super.visitDecision(ctx);
 
     }
 
@@ -348,7 +354,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
     /**
      * Is triggered when Setvar is entered and will define a previously declared variable
      */
-    public void enterSetvar(KnightCodeParser.SetvarContext ctx){
+    public Object visitSetvar(KnightCodeParser.SetvarContext ctx){
     
         String varName = ctx.ID().getText(); 
 
@@ -378,25 +384,18 @@ public class MyBaseListener extends KnightCodeBaseListener{
         else if (var.getType().equals("STRING")){
             mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation());
         }
-        System.out.println("SymbolTable");
-        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
-            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
-        }
+        printSymbolTable();
+
+        return super.visitSetvar(ctx);
+        
 
     }//end enterSetvar
 
     @Override
-    public void exitSetvar(KnightCodeParser.SetvarContext ctx){
-        System.out.println("Exiting setVar\nSymbolTable");
-        for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
-            System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
-        }
-    }
-    @Override
     /**
      * Is triggered whenever print is encountered and will either print out the value of the identifier specified, or a string that is specified
      */
-    public void enterPrint(KnightCodeParser.PrintContext ctx){
+    public Object visitPrint(KnightCodeParser.PrintContext ctx){
         //Debug
         System.out.println("Enter Print");
         
@@ -417,20 +416,22 @@ public class MyBaseListener extends KnightCodeBaseListener{
                 mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
             }
         }
+
         //If the subject is a String, it will load the string to the constant pool
         else if(ctx.STRING()!=null){
             String str = removeFirstandLast(ctx.STRING().getText());
             mainVisitor.visitLdcInsn(str);
             mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
         }
-    }//end enterPrint
+        return super.visitPrint(ctx);
+    }//end visitPrint
 
     
     @Override
     /**
      * Method that will read an input from the user and store it in the variable whose identifier follows the read call 
      */
-    public void enterRead(KnightCodeParser.ReadContext ctx){
+    public Object visitRead(KnightCodeParser.ReadContext ctx){
         //debug
         System.out.println("Entering Read");
         
@@ -471,7 +472,7 @@ public class MyBaseListener extends KnightCodeBaseListener{
             mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation()); // Store the int value in a variable
         }
 
-
+        return super.visitRead(ctx);
     }//end enterRead
     
     

@@ -49,11 +49,15 @@ public class kcc {
             
             //System.out.println(tree.toStringTree(parser));
             
-            MyBaseListener listener = new MyBaseListener(output);
-            ParseTreeWalker walker = new ParseTreeWalker();
+            //MyBaseListener listener = new MyBaseListener(output);
+            MyBaseVisitor visitor = new MyBaseVisitor(output);
+            //ParseTreeWalker walker = new ParseTreeWalker();
 
-            walker.walk(listener, tree);
-            
+            //walker.walk(listener, tree);
+
+           visitor.visit(tree);
+           visitor.closeClass();
+
         }
         catch(IOException e){
             System.out.println(e.getMessage());
