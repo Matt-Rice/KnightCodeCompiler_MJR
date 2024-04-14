@@ -89,7 +89,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
     
                 Utilities.writeFile(b,this.programName+".class");
     
-            System.out.println("\n\n\nCompiling Finished");
+            System.out.println("\nCompiling Finished");
         
     }//end closeClass
 
@@ -178,6 +178,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
             mainVisitor.visitLdcInsn(value);
         }//number
 
+
         // If the expr is an identifier
         else if (ctx instanceof KnightCodeParser.IdContext){
             String id = ctx.getText();
@@ -238,8 +239,11 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
         
     }//end evalExpr
 
-    @Override
 
+    @Override
+    /**
+     * Method that when visiting a comparison, will perform the comparison operation and if true load one, if false load 0
+     */
     public Object visitComparison(KnightCodeParser.ComparisonContext ctx){
         
         Label trueLabel = new Label();
@@ -264,7 +268,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
             case "EQ":
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, trueLabel);
                 break;
-            case "NEQ":
+            case "NE":
             mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, trueLabel);
                 break;
         }
@@ -280,7 +284,8 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
         mainVisitor.visitLabel(endLabel);
 
         return super.visitComparison(ctx);
-    }
+    }//end visitComparison
+
 
     /**
      * Method that will check if a string is either a number or an identifier in the symbol table and will load it accordingly
@@ -302,7 +307,12 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
     }//end loadInteger
     
     @Override
+    /**
+     * Method that handles the logic for a simple IF THEN ELSE logic based off of a comparison using jumps
+     */
     public Object visitDecision(KnightCodeParser.DecisionContext ctx){
+        
+        //Labels used for jumping
         Label trueLabel = new Label();
         Label endLabel = new Label();
         
@@ -317,38 +327,62 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
         //Decide which comparison to use
         String op = ctx.comp().getText();
         
+        //Handles whether or not it will jump to the IF THEN block
         switch (op) {
-            case "GT":
+            case ">":
+                System.out.println("GT");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, trueLabel);
                 break;
         
-            case "LT":
+            case "<":
+                System.out.println("LT");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, trueLabel);
                 break;
 
-            case "EQ":
+            case "=":
+                System.out.println("EQ");  
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, trueLabel);
                 break;
-            case "NEQ":
-            mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, trueLabel);
+            case "<>":
+                System.out.println("NEQ");
+                mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, trueLabel);
+                break;
+            default:
+                System.out.println("Else");
                 break;
         }
-        //Else executes here
-        visitStat(ctx.stat(1));
+
+        int elseLocation = 6; // least possible child index for else location (IF x comp y THEN stat ELSE)
+
+        //Loop that figures out how many stats there are in the if block
+        while (!ctx.getChild(elseLocation).getText().equals("ELSE")){
+            elseLocation++;
+        }  
         
+        //ELSE
+        //Loop that runs all of the stats within the else block
+        for(int i = elseLocation+1; i<ctx.getChildCount(); i++){
+            visit(ctx.getChild(i));
+        }
+
+        //Jump to end after else has executed
         mainVisitor.visitJumpInsn(Opcodes.GOTO, endLabel);
 
-
+        //IF THEN
         // Go here when comparison is true
         mainVisitor.visitLabel(trueLabel);
-        visitStat(ctx.stat(0));
+
+        //Starts at location of first stat and visits stats until reaches the location of the else
+        for (int i = 5; i< elseLocation;i++){
+            visit(ctx.getChild(i));
+        }
         
         //End label
         mainVisitor.visitLabel(endLabel);
 
-        return super.visitDecision(ctx);
+        return null;
 
-    }
+    }//end visitDecision
 
     @Override
     /**
@@ -363,27 +397,30 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
 
         Variable var = symbolTable.get(varName);
         
-        //Need to evaluate EXPR before setting stuff
-        //Make a method that takes in expr context and checks for operators and such
-
         // If the variable was not previously declared
         // May do error handling in the future
         if (var == null){
             System.err.println(varName + " has not been declared yet");
             System.exit(1);
         }
-        evalExpr(ctx.expr());
+        else if(ctx.expr() != null){
+            evalExpr(ctx.expr());
 
-        //Defines variable if it is an INTEGER
-        if (var.getType().equals("INTEGER")){
-            System.out.println("Storing for " + varName);
-            mainVisitor.visitVarInsn(Opcodes.ISTORE, var.getLocation());
+            //Defines variable if it is an INTEGER
+            if (var.getType().equals("INTEGER")){
+                System.out.println("Storing for " + varName);
+                mainVisitor.visitVarInsn(Opcodes.ISTORE, var.getLocation());
+            }
+            
         }
-        
         //Defines variable if it is an STRING
-        else if (var.getType().equals("STRING")){
+        else if (var.getType().equals("STRING") && ctx.STRING() != null){
+            String str = removeFirstandLast(ctx.STRING().getText());
+            mainVisitor.visitLdcInsn(str);
             mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation());
         }
+           
+        
         printSymbolTable();
 
         return super.visitSetvar(ctx);
@@ -473,9 +510,78 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor{
         }
 
         return super.visitRead(ctx);
-    }//end enterRead
+    }//end visitRead
     
-    
+    @Override
+    public Object visitLoop(KnightCodeParser.LoopContext ctx){
+        //Labels used for jumping
+        Label beginLabel = new Label();
+        Label whileTrueLabel = new Label();
+        Label endLoop = new Label();
+        
+        //Begin loop Label
+        mainVisitor.visitLabel(beginLabel);
+
+        //Load the children to be compared
+        String num1 = ctx.getChild(1).getText();
+        String num2 = ctx.getChild(3).getText();
+
+        loadInteger(num1);
+        loadInteger(num2);
+
+        //Decide which comparison to use
+        String op = ctx.comp().getText();
+        
+        //Handles whether or not it will jump to endLoop
+        switch (op) {
+            case ">":
+                System.out.println("LE");
+                mainVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, endLoop);
+                break;
+        
+            case "<":
+                System.out.println("GE");
+                mainVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, endLoop);
+                break;
+
+            case "=":
+                System.out.println("NEQ");  
+                mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, endLoop);
+                break;
+            case "<>":
+                System.out.println("EQ");
+                mainVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, endLoop);
+                break;
+            default:
+                System.out.println("Loop Will Execute");
+                break;
+        }
+
+        /* 
+        int endLocation = 6; // least possible child index for ENDWHILE location (WHILE x comp y DO stat ENDWHILE)
+
+        //Loop that figures out how many stats there are in the if block
+        while (!ctx.getChild(endLocation).getText().equals("ENDWHILE")){
+            endLocation++;
+        }  
+        
+        */
+
+        //ELSE
+        //Loop that runs all of the stats within the else block
+        for(int i = 5; i<ctx.getChildCount(); i++){
+            visit(ctx.getChild(i));
+        }
+        
+        //Jumps back to top if loop is set to execute
+        mainVisitor.visitJumpInsn(Opcodes.GOTO, beginLabel);
+        
+        //End label
+        mainVisitor.visitLabel(endLoop);
+
+        return null;
+
+    }
 
     
 }//end MyBaseListener

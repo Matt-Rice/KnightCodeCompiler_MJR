@@ -1,10 +1,22 @@
 PROGRAM test1
 
 DECLARE
+    INTEGER y
     INTEGER x
+    INTEGER z
+    STRING h 
+    STRING w
 
 BEGIN
-    SET x := 5
-    PRINT x
+    SET x := 0
+
+    
+
+    WHILE x < 5 DO SET x := x + 1 PRINT x ENDWHILE
+
+
+    
+  
+   
 
 END
