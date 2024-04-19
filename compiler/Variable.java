@@ -1,3 +1,11 @@
+ /**
+* Class that defines a Variable constructor and provides methods to get its attributes
+* @author Matt Rice
+* @version 1.0
+* Assignment 5
+* CS322 - Compiler Construction
+* Spring 2024
+**/
 package compiler;
 
 public class Variable {
@@ -11,6 +19,7 @@ public class Variable {
      * Constructor for a variable
      * @param variableType the type of a given variable
      * @param name the name of the variable
+     * @param memoryLocation the memory location of the variable on the stack
      */
     public Variable(String name, String variableType, int memoryLocation){
         
@@ -43,5 +52,13 @@ public class Variable {
     public int getLocation(){
         return memoryLocation;
     }// end getLocation
+
+    /**
+     * Returns each of the attributes of a variable as a string
+     * @return a String containing all of the attributes of the Variable
+     */
+    public String toString(){
+        return "Name: " + name + " Type: " + variableType + " Location: " + memoryLocation;
+    }
     
 }//end Variable

@@ -29,39 +29,35 @@ public class kcc {
         String output; //name for the output
       
         // Handles if args are not entered properly
-        if (args.length <2) {
+        if (args.length < 2) {
             System.err.println("Run as: java compiler/kcc <pathToIp/input.kcc> <pathToOp/output>\nReplace pathToIp with the directory of the input file and pathToOp with the desired output location");
             return;
         }
       
-
         try{
             input = CharStreams.fromFileName(args[0]);  //get the input
             
             lexer = new KnightCodeLexer(input); //create the lexer
             tokens = new CommonTokenStream(lexer); //create the token stream
             parser = new KnightCodeParser(tokens); //create the parser
-            output = args[1];
+            output = args[1]; //get the output
 
             ParseTree tree = parser.file();  //set the start location of the parser
              
             Trees.inspect(tree, parser);  //displays the parse tree
             
-            //System.out.println(tree.toStringTree(parser));
-            
-            //MyBaseListener listener = new MyBaseListener(output);
             MyBaseVisitor visitor = new MyBaseVisitor(output);
-            //ParseTreeWalker walker = new ParseTreeWalker();
+            
+            //Visits the tree
+            visitor.visit(tree);
 
-            //walker.walk(listener, tree);
-
-           visitor.visit(tree);
-           visitor.closeClass();
+            //Closes the class
+            visitor.closeClass();
 
         }
         catch(IOException e){
-            System.out.println(e.getMessage());
+            System.out.println("Please make sure that the path to the files are correct and run again.");
         }
     
-    }
-}
+    }//end main
+}//end kcc

@@ -17,4 +17,6 @@ BEGIN
 		PRINT x
 		SET x := x - 1
 	ENDWHILE
+
+	PRINT z
 END
