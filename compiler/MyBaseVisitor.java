@@ -20,7 +20,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
 	private MethodVisitor mainVisitor; //global MethodVisitor
 	private String programName; //name of the output file
     private Map<String, Variable> symbolTable; //map that will store the name of the variable along with its corresponding Variable object which will contain some of its attributes
-    private int memoryPointer;
+    private int memoryPointer; //Memory pointer to the top of the stack
 
 
     /**
@@ -41,12 +41,15 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         return s.substring(1, s.length() -1);
     }//end removeFirstandLast
 
+    /**
+     * Method that prints the key value pairs from the SymbolTable
+     */
     public void printSymbolTable(){
         System.out.println("SymbolTable");
         for (Map.Entry<String, Variable> entry : symbolTable.entrySet()){
             System.out.println("Key: " + entry.getKey() + " Var: " + entry.getValue().toString());
         }
-    }
+    }//end printSymbolTable
 
     /**
      * Method that will set up the ClassWriter and create the constructor
@@ -76,27 +79,34 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
      */
     public void closeClass(){
 
+            //Ends the mainVisitor
             mainVisitor.visitInsn(Opcodes.RETURN);
             mainVisitor.visitMaxs(0, 0);
             mainVisitor.visitEnd();
-    
+
+            //Ends the ClassWriter
             cw.visitEnd();
-    
+
+                //Creates an array of type byte that contains the contents of the ClassWriter
                 byte[] b = cw.toByteArray();
-    
+
+                //Writes the byte array to the output file
                 Utilities.writeFile(b,this.programName+".class");
-    
-            System.out.println("\nCompiling Finished");
+        
+            //Let the user know that compiling has finished
+            System.out.println("Compiling Finished for: " + this.programName);
         
     }//end closeClass
 
     @Override
     /**
      * Calls the beginClass method which creates the ClassWriter and constructor for the KnightCode class 
+     * @param ctx the parser tree context of the file
+     * @return the visitor result
      */
     public Object visitFile(KnightCodeParser.FileContext ctx){
-        System.out.println("Entering File");
-
+        
+        //Begins the class
         beginClass(programName);
         return super.visitFile(ctx);
     }//end visitFile
@@ -104,12 +114,15 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Once Declare is visited, a HashMap for the symbol table will be initialized and the stack memory pointer will be set to zero
+     * @param ctx the parser tree context of the declaration
+     * @return the visitor result
      */
     public Object visitDeclare(KnightCodeParser.DeclareContext ctx){
-        //Debug
-        System.out.println("Visit Declare");
         
+        //Initializes the symbol table hashmap
         symbolTable = new HashMap<>();
+
+        //Initializes the memoryPointer to the top of the stack at 0
         memoryPointer = 0;
 
         return super.visitDeclare(ctx);
@@ -118,11 +131,12 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Once variable is visited, the name and type will be used to instantiate a new Variable object using the attributes from the declaration and put it into the symbol table
+     * @param ctx the parser tree context of the vairable
+     * @return the visitor result
      */
     public Object visitVariable(KnightCodeParser.VariableContext ctx){
-        //Debug
-        System.out.println("Visit Variable");
         
+        //Gets the type of the variable
         String type = ctx.vartype().getText();
 
         // Check if declared type is unsupported
@@ -136,21 +150,17 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         Variable v = new Variable(name, type, memoryPointer++);
         symbolTable.put(name, v);
 
-        printSymbolTable();
-
         return super.visitVariable(ctx);
     }//end visitVariable
 
     @Override
     /**
      * Method that visits the body and initializes the main method
+     * @param ctx the parser tree context of the body
+     * @return the visitor result
      */
-    public Object visitBody(KnightCodeParser.BodyContext ctx){
-        //Debug
-        System.out.println("Enter Body");
-        
+    public Object visitBody(KnightCodeParser.BodyContext ctx){  
         // Start MethodVisitor for main method
-        
         mainVisitor=cw.visitMethod(Opcodes.ACC_PUBLIC+Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null);
         mainVisitor.visitCode();
 
@@ -163,74 +173,87 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
      */
     public void evalExpr(KnightCodeParser.ExprContext ctx){
         
-        // If the expr is just a number reads and parses the text as an int and loads it to constant pool
+        //If the expr is just a number reads and parses the text as an int and loads it to constant pool
         if (ctx instanceof KnightCodeParser.NumberContext){
+            //Gets value of the number
             int value = Integer.parseInt(ctx.getText());
-            
-            //debug
-            System.out.println(value + " Is on stack");
+
+            //Loads value to constant pool
             mainVisitor.visitLdcInsn(value);
         }//number
 
-        // If the expr is an identifier
+        //If the expr is an instance of identifier
         else if (ctx instanceof KnightCodeParser.IdContext){
+            //Gets the identifier
             String id = ctx.getText();
+
+            //Creates a variable reference object for the variable stored in the symbol table with the given id
             Variable var = symbolTable.get(id);
             
-            //debug
-            System.out.println("expr id " + id + "\nvar: " + var.toString());
-
-            // If type of the variable is INTEGER
+            //If type of the variable is INTEGER
             if (var.getType().equals("INTEGER")){
+                //Loads the information where the variable is stored at
                 mainVisitor.visitVarInsn(Opcodes.ILOAD, var.getLocation());
-                System.out.println(id+ " is on stack");
             }
 
+            //If type of the variable is STRING
             else if (var.getType().equals("STRING")){
                 mainVisitor.visitVarInsn(Opcodes.ALOAD, var.getLocation());
             } 
             
         }//id   
-        //Subtraction
+
+        //If the expr is an instance of Subtraction
         else if (ctx instanceof KnightCodeParser.SubtractionContext){
             
+            //Loop that evaluates each expression from the context so subtraction can be performed
             for(KnightCodeParser.ExprContext expr : ((KnightCodeParser.SubtractionContext)ctx).expr()){
                 evalExpr(expr);
             }//for
-        System.out.println("subbing");
+        
+        //Load the subtraction opcode
         mainVisitor.visitInsn(Opcodes.ISUB);
             
-        }
-        //Addition
+        }//sub
+
+        //If the expr is an instance of Addition
         else if (ctx instanceof KnightCodeParser.AdditionContext){
-            
+
+            //Loop that evaluates each expression from the context so addition can be performed
             for(KnightCodeParser.ExprContext expr : ((KnightCodeParser.AdditionContext)ctx).expr()){
                 evalExpr(expr);
             }//for
-        System.out.println("adding");
+        
+        //Load the addition opcode
         mainVisitor.visitInsn(Opcodes.IADD);
             
-        }
-        //Multiplication
+        }//add
+
+        //If the expr is an instance of Multiplication
         else if (ctx instanceof KnightCodeParser.MultiplicationContext){
             
+            //Loop that evaluates each expression from the context so multiplication can be performed
             for(KnightCodeParser.ExprContext expr : ((KnightCodeParser.MultiplicationContext)ctx).expr()){
                 evalExpr(expr);
             }//for
-        System.out.println("Multiplying");
+        
+        //Load the multiplication opcode
         mainVisitor.visitInsn(Opcodes.IMUL);
             
-        }
-        //Division
+        }//mul
+
+        //If the expr is an instance of Division
         else if (ctx instanceof KnightCodeParser.DivisionContext){
             
+            //Loop that evaluates each expression from the context so division can be performed
             for(KnightCodeParser.ExprContext expr : ((KnightCodeParser.DivisionContext)ctx).expr()){
                 evalExpr(expr);
             }//for
-        System.out.println("dividing");
+        
+        //Load the division opcode
         mainVisitor.visitInsn(Opcodes.IDIV);
             
-        }
+        }//div
 
     }//end evalExpr
 
@@ -238,30 +261,35 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Method that when visiting a comparison, will perform the comparison operation and if true load one, if false load 0
+     * @param ctx the parser tree context of the comparison
+     * @return the visitor result
      */
     public Object visitComparison(KnightCodeParser.ComparisonContext ctx){
         
-        Label trueLabel = new Label();
-        Label endLabel = new Label();
+        Label trueLabel = new Label();//Label for true
+        Label endLabel = new Label();//Label for false
 
+        //Get the comparison operator
         String op = ctx.comp().getText();
 
+        //Evaluates both of the expressions to make sure they are loaded
         evalExpr(ctx.expr(0));
         evalExpr(ctx.expr(1));
 
+        //Switch statement that decides which comparison instruction should be loaded
         switch (op) {
-            case "GT":
+            case ">":
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, trueLabel);
                 break;
         
-            case "LT":
+            case "<":
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, trueLabel);
                 break;
 
-            case "EQ":
+            case "=":
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, trueLabel);
                 break;
-            case "NE":
+            case "<>":
             mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, trueLabel);
                 break;
         }
@@ -274,6 +302,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         mainVisitor.visitLabel(trueLabel);
         mainVisitor.visitLdcInsn(1);
 
+        //Visit the end label
         mainVisitor.visitLabel(endLabel);
 
         return super.visitComparison(ctx);
@@ -285,6 +314,8 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
      * @param operand the string with the ID or value to be loaded
      */
     public void loadInteger(String operand){
+        
+        //Memory loaction of the variable
         int location;
         
         //If the string is a key of the symbol table ("It's the ID of a variable")
@@ -302,12 +333,14 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Method that handles the logic for a simple IF THEN ELSE logic based off of a comparison using jumps
+     * @param ctx the parser tree context of the decision
+     * @return null
      */
     public Object visitDecision(KnightCodeParser.DecisionContext ctx){
         
         //Labels used for jumping
-        Label trueLabel = new Label();
-        Label endLabel = new Label();
+        Label trueLabel = new Label();//if the comp is true
+        Label endLabel = new Label();//the end label
         
         
         //Load the children to be compared
@@ -317,36 +350,29 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         loadInteger(num1);
         loadInteger(num2);
 
-        //Decide which comparison to use
+        //Gets the comparison operator
         String op = ctx.comp().getText();
         
         //Handles whether or not it will jump to the IF THEN block
         switch (op) {
             case ">":
-                System.out.println("GT");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPGT, trueLabel);
                 break;
         
             case "<":
-                System.out.println("LT");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPLT, trueLabel);
                 break;
 
             case "=":
-                System.out.println("EQ");  
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, trueLabel);
                 break;
             case "<>":
-                System.out.println("NEQ");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, trueLabel);
                 break;
-            default:
-                System.err.println("ERROR: Comparison operator not recongnized.");
-                System.exit(1);
         }
 
         //Check to see if there is an else statement
-        boolean hasElse = false;
+        boolean hasElse = false; //true if there is an else statement
         int endLocation = 6; //minimum location of the endif
 
          //Loop that figures out the location of the endif
@@ -379,7 +405,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
             }
         }
 
-        //Jump to end after else or no else has executed
+        //Jump to end after else or no else has executed and the comp was false
         mainVisitor.visitJumpInsn(Opcodes.GOTO, endLabel);
 
         //IF THEN
@@ -410,21 +436,19 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
 
     @Override
     /**
-     * Is triggered when Setvar is entered and will define a previously declared variable
+     * Is triggered when Setvar is visited and will define a previously declared variable
+     * @param ctx the parser tree context of the setVar
+     * @return the visitor result
      */
     public Object visitSetvar(KnightCodeParser.SetvarContext ctx){
         
         //Name of variable to be set
         String varName = ctx.ID().getText(); 
 
-        //Debug
-        System.out.println("Enter SetVar: " + varName);
-
         //Creates variable object for the variable
         Variable var = symbolTable.get(varName);
         
-        // If the variable was not previously declared
-        // May do error handling in the future
+        //Stops the visiting if the variable was not previously declared
         if (var == null){
             System.err.println("ERROR: " + varName + " has not been declared yet");
             System.exit(1);
@@ -435,7 +459,6 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
 
             //Defines variable if it is an INTEGER
             if (var.getType().equals("INTEGER")){
-                System.out.println("Storing for " + varName);
                 mainVisitor.visitVarInsn(Opcodes.ISTORE, var.getLocation());
             }
             
@@ -447,8 +470,6 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
             mainVisitor.visitVarInsn(Opcodes.ASTORE, var.getLocation());
         } 
         
-        printSymbolTable();
-
         return super.visitSetvar(ctx);
         
     }//end visitSetvar
@@ -456,11 +477,12 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Is triggered whenever print is encountered and will either print out the value of the identifier specified, or a string that is specified
+     * @param ctx the parser tree context of the print
+     * @return the visitor result
      */
     public Object visitPrint(KnightCodeParser.PrintContext ctx){
-        //Debug
-        System.out.println("Enter Print");
-        
+       
+        //Fetches the print stream field
         mainVisitor.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
 
         // If the subject of the printing is an ID then it searches and finds its stack location so it can be loaded to be printed
@@ -492,13 +514,15 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Method that will read an input from the user and store it in the variable whose identifier follows the read call 
+     * @param ctx the parser tree context of the read
+     * @return the visitor result
      */
     public Object visitRead(KnightCodeParser.ReadContext ctx){
-        //debug
-        System.out.println("Entering Read");
         
         //Initializes the variable that will store the value inputted by the user
         Variable var = symbolTable.get(ctx.ID().getText());
+
+        //Sets the location where the scanner will be loaded to as the next valuable in the memory location
         int scanLocation = memoryPointer++;
 
         // Initializes the Scanner object
@@ -520,7 +544,6 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         //Handles if variable is of type String
         else if (var.getType().equals("STRING")){
             
-
             // Read String from the user
             mainVisitor.visitVarInsn(Opcodes.ALOAD, scanLocation); // Loads scanner
             mainVisitor.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/util/Scanner", "nextLine", "()Ljava/lang/String;", false); // Scan.nextLong()
@@ -533,10 +556,12 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
     @Override
     /**
      * Method that will handle the logic for a simple while loop
+     * @param ctx the parser tree context of the loop
+     * @return null
      */
     public Object visitLoop(KnightCodeParser.LoopContext ctx){
-        //Labels used for jumping
         
+        //Labels used for jumping
         Label beginLabel = new Label(); //beginning of loop
         Label endLoop = new Label(); //leaves the loop
         
@@ -550,35 +575,29 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         loadInteger(num1);
         loadInteger(num2);
 
-        //Decide which comparison to use
+        //Gets the comparison operator
         String op = ctx.comp().getText();
         
         //Handles whether or not it will jump to endLoop
+        //Loads the jump opposite of the operator because it needs to jump to the end of the loop when the comparison is not true
         switch (op) {
             case ">":
-                System.out.println("LE");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPLE, endLoop);
                 break;
         
             case "<":
-                System.out.println("GE");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPGE, endLoop);
                 break;
 
             case "=":
-                System.out.println("NEQ");  
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPNE, endLoop);
                 break;
             case "<>":
-                System.out.println("EQ");
                 mainVisitor.visitJumpInsn(Opcodes.IF_ICMPEQ, endLoop);
                 break;
-            default:
-                System.err.println("ERROR: Comparison operator not recongnized.");
-                System.exit(1);
         }//end switch
 
-        //Loop that runs all of the stats within the while block
+        //Loop that visits all of the stats within the while block
         for(int i = 5; i<ctx.getChildCount(); i++){
             visit(ctx.getChild(i));
         }
