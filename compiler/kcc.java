@@ -8,7 +8,7 @@
 **/
 package compiler;
 
-import lexparse.*;
+import lexparse.*;//lexparse directory
 import java.io.IOException;
 
 //ANTLR packages
@@ -16,7 +16,7 @@ import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.tree.*;
-import org.antlr.v4.gui.Trees;
+
 
 public class kcc {
 
@@ -44,16 +44,13 @@ public class kcc {
 
             ParseTree tree = parser.file();  //set the start location of the parser
              
-            Trees.inspect(tree, parser);  //displays the parse tree
-            
-            MyBaseVisitor visitor = new MyBaseVisitor(output);
+            MyBaseVisitor visitor = new MyBaseVisitor(output);//MyBaseVisitor object with the program name of the output which will be used to visit the tree
             
             //Visits the tree
             visitor.visit(tree);
 
-            //Closes the class
+            //Closes the class and writes out the result to the output loation
             visitor.closeClass();
-
         }
         catch(IOException e){
             System.out.println("Please make sure that the path to the files are correct and run again.");
