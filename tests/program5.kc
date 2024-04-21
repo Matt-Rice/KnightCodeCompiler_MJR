@@ -1,0 +1,37 @@
+PROGRAM Program5
+
+DECLARE
+	INTEGER x
+    INTEGER y
+    INTEGER z 
+    STRING name
+	INTEGER reps
+
+BEGIN
+	PRINT "Enter your name: "
+	READ name
+	PRINT "Enter repetitions: "
+	READ reps
+	WHILE reps > 0 DO
+		PRINT name
+		SET reps := reps - 1
+	ENDWHILE
+
+    SET x := 5
+
+    PRINT "Enter an integer for y"
+    READ y
+
+    PRINT "Maximum of x and y:"
+    IF y<x THEN 
+        PRINT x
+    ELSE
+        PRINT y 
+    ENDIF
+
+    PRINT "Please enter an integer for z"
+    READ z
+
+    PRINT z
+
+END

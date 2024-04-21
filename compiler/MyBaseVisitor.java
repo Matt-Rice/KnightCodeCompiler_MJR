@@ -24,7 +24,7 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
 
 
     /**
-     * Constructor for MyBaseListener
+     * Constructor for MyBaseVisitor
      * @param programName the name of the program
      */
     public MyBaseVisitor(String programName){
@@ -592,7 +592,6 @@ public class MyBaseVisitor extends KnightCodeBaseVisitor<Object>{
         return null;
 
     }//end visitLoop
-
 
 }//end MyBaseVisitor
  

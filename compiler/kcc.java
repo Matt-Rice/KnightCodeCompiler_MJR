@@ -1,5 +1,5 @@
 /**
-* Class that kicks off the compiler and excepts two command line arguments: 1 the name of the input .kcc file, the name of the file that will be outputted. Path to files must be included.
+* Class that kicks off the compiler and accepts two command line arguments: 1 the name of the input .kcc file, the name of the file that will be outputted. Path to files must be included.
 * @author Matt Rice
 * @version 1.0
 * Assignment 5
