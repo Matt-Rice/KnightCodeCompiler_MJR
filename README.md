@@ -1,6 +1,6 @@
 # KnightCodeCompiler_MJR
 
-This project creates a compiler for a basic programming language called KnightCode. KnightCode supports two data types: STRING and INTEGER and is capable of performing basic arithmetic (addition, subtraction, multiplication, and division), printing out information to the command line, reading input from a user. It also supports conditional if else statements and while loops. 
+This project creates a compiler for a basic programming language called KnightCode. KnightCode supports two data types: STRING and INTEGER and is capable of performing basic arithmetic (addition, subtraction, multiplication, and division), printing out information to the command line, reading input from a user. It also supports conditional if else statements and while loops. Comments are also supported in the form of #This is a comment.
 
 This projects utilizes two libraries that will need to be installed before running:
     
